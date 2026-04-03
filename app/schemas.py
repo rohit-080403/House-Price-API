@@ -7,15 +7,15 @@ from starlette.exceptions import HTTPException
 import app
 
 class PropertyType(str , Enum):
-  apartment : "apartment"
-  villa : "villa"
-  bunglow : "bunglow"
-  studio : "studio"
+  apartment = "apartment"
+  villa = "villa"
+  bungalow = "bungalow"
+  studio = "studio"
 
 class FurnishingStatus(str , Enum):
-  furnished : "furnished"
-  semi_furnished : "semi_furnished"
-  unfurnished : "unfurnished"
+  furnished = "furnished"
+  semi_furnished = "semi_furnished"
+  unfurnished = "unfurnished"
 
 class HouseInput(BaseModel):
 
@@ -34,7 +34,7 @@ class HouseInput(BaseModel):
   # 2. optional fields
   distance_from_center_km : Optional[float] = Field(None , gt=0 , lt=200 , description="Distance of the property from the city center in kilometers")
 
-  city : Optional[str] = Field(min_length=2 , max_length=50 , description="City where the property is located")
+  city : Optional[str] = Field(None, min_length=2 , max_length=50 , description="City where the property is located")
 
   # 3. using Enum here
   property_type : PropertyType= Field(description="Type of the property")
@@ -52,6 +52,8 @@ class HouseInput(BaseModel):
   @field_validator('city')
   @classmethod
   def validate_city(cls, value:str) -> str:
+    if value is None:
+      return value
     value = value.strip()
 
     if not value:

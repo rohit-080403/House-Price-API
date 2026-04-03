@@ -1,4 +1,5 @@
 from fastapi import FastAPI , HTTPException
+from contextlib import asynccontextmanager
 
 from app.schemas import(
     HouseInput,
@@ -8,10 +9,21 @@ from app.schemas import(
     HouseUpdateInput
 )
 
+from app.model_loader import house_model
+
+# Startup/Shutdown events using lifespan
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: load model
+    house_model.load()
+    yield
+    # Shutdown: cleanup (if needed)
+
 app = FastAPI(
   title="House Price Prediction",
   description ="An API to predict house prices using Ml model",
-  version="1.0.0"
+  version="1.0.0",
+  lifespan=lifespan
 )
 
 @app.get("/")
@@ -22,6 +34,7 @@ def root():
 def health_check():
     return {
         "status":"healthy",
+        "model_loaded": house_model.is_loaded,
         "api_version" : "1.0.0"
     }
 
@@ -52,54 +65,12 @@ def rough_estimate(size:float , rooms : int =1):
 
 @app.post("/predict" , response_model=PricePrediction)
 def price_prediction(house: HouseInput):
-
-    base_price = house.size_sqft * 5000
-
-    # City multiplier
-    city_multipliers = {
-        "Mumbai": 3.0,
-        "Delhi": 2.5,
-        "Bangalore": 2.2,
-        "Pune": 1.8,
-        "Hyderabad": 1.7,
-    }
-    multiplier = city_multipliers.get(house.city, 1.5)
-
-    # Adjustments
-    bedroom_bonus    = house.num_bedrooms * 50000
-    age_discount     = house.age_of_property * 20000
-    parking_bonus    = 200000 if house.has_parking else 0
-    gym_bonus        = 150000 if house.has_gym else 0
-    pool_bonus       = 300000 if house.has_swimming_pool else 0
-
-    furnishing_bonus = {
-        "furnished": 300000,
-        "semi-furnished": 150000,
-        "unfurnished": 0
-    }.get(house.furnishing_status.value, 0)
-
-    # Final price
-    predicted_price = (
-        (base_price * multiplier)
-        + bedroom_bonus
-        - age_discount
-        + parking_bonus
-        + gym_bonus
-        + pool_bonus
-        + furnishing_bonus
-    )
-
-    predicted_price = max(predicted_price, 500000)  # floor price
-
-    return PricePrediction(
-        predicted_price_inr=round(predicted_price, 2),
-        price_per_sqft=round(predicted_price / house.size_sqft, 2),
-        confidence_score=0.82,
-        price_range_low=round(predicted_price * 0.90, 2),
-        price_range_high=round(predicted_price * 1.10, 2),
-        city=house.city,
-        property_type=house.property_type.value
-    )
+    if not house_model.is_loaded:
+        raise HTTPException(status_code=503, detail="Model is not loaded yet. Please try again later.")
+    
+    # all predidction logic is moved to model_loader.py
+    result = house_model.predict(house)
+    return PricePrediction(**result)
 
 
 @app.get("/market/{city}", response_model=MarketResponse)
