@@ -136,7 +136,7 @@ class Locationinfo(BaseModel):
 class MarketResponse(BaseModel):
   location: Locationinfo
   total_listings : int
-  last_updated : str
+  last_updated : Optional[str] = None
 
 
 # 9. partial update schema 
